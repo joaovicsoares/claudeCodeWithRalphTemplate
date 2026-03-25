@@ -100,7 +100,7 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   printf '%s\n' "$OUTPUT"
   
   # Check for completion signal
-  if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
+  if printf '%s\n' "$OUTPUT" | grep -Fxq "<promise>COMPLETE</promise>"; then
     echo ""
     echo "Ralph completed all tasks!"
     echo "Completed at iteration $i of $MAX_ITERATIONS"
