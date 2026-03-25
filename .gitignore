@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.venv/
+api/venv/
+
+# Tooling / editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Ralph runtime artifacts
+scripts/ralph/runtime/
+scripts/ralph/archive/
+scripts/ralph/progress.txt
+scripts/ralph/.last-branch
+scripts/ralph/prd.json
