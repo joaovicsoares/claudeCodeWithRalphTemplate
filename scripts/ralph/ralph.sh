@@ -95,7 +95,7 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1) || true
   else
     # Codex CLI: use non-interactive exec mode with workspace-write sandbox
-    OUTPUT=$(codex exec --full-auto --sandbox workspace-write -C "$SCRIPT_DIR" - < "$SCRIPT_DIR/CODEX.md" 2>&1) || true
+    OUTPUT=$(codex exec --dangerously-bypass-approvals-and-sandbox -C "$SCRIPT_DIR" - < "$SCRIPT_DIR/CODEX.md" 2>&1) || true
   fi
   printf '%s\n' "$OUTPUT"
   
