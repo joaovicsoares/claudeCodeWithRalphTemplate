@@ -1,21 +1,39 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [--tool amp|claude|codex] [max_iterations]
+# Usage: ./ralph.sh [--tool amp|claude|codex] [--target /path/to/repo] [max_iterations]
 
 set -e
 
 # Parse arguments
 TOOL="amp"  # Default to amp for backwards compatibility
 MAX_ITERATIONS=10
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TARGET_DIR="$SCRIPT_DIR"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
     --tool)
+      if [[ -z "${2:-}" ]]; then
+        echo "Error: --tool requires a value (amp|claude|codex)."
+        exit 1
+      fi
       TOOL="$2"
       shift 2
       ;;
     --tool=*)
       TOOL="${1#*=}"
+      shift
+      ;;
+    --target)
+      if [[ -z "${2:-}" ]]; then
+        echo "Error: --target requires a directory path."
+        exit 1
+      fi
+      TARGET_DIR="$2"
+      shift 2
+      ;;
+    --target=*)
+      TARGET_DIR="${1#*=}"
       shift
       ;;
     *)
@@ -33,7 +51,19 @@ if [[ "$TOOL" != "amp" && "$TOOL" != "claude" && "$TOOL" != "codex" ]]; then
   echo "Error: Invalid tool '$TOOL'. Must be 'amp', 'claude', or 'codex'."
   exit 1
 fi
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [ -z "$TARGET_DIR" ]; then
+  echo "Error: --target requires a non-empty path."
+  exit 1
+fi
+
+if [ ! -d "$TARGET_DIR" ]; then
+  echo "Error: Target directory does not exist: $TARGET_DIR"
+  exit 1
+fi
+
+TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
+
 PRD_FILE="$SCRIPT_DIR/prd.json"
 PROGRESS_FILE="$SCRIPT_DIR/progress.txt"
 ARCHIVE_DIR="$SCRIPT_DIR/archive"
@@ -80,6 +110,8 @@ if [ ! -f "$PROGRESS_FILE" ]; then
 fi
 
 echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"
+echo "Brain directory: $SCRIPT_DIR"
+echo "Target repository: $TARGET_DIR"
 
 for i in $(seq 1 $MAX_ITERATIONS); do
   echo ""
@@ -87,15 +119,27 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   echo "  Ralph Iteration $i of $MAX_ITERATIONS ($TOOL)"
   echo "==============================================================="
 
+  PROMPT_PREAMBLE=$(cat <<EOF
+Project control files are outside the target repository. Use these exact paths:
+- PRD file: $PRD_FILE
+- Progress file: $PROGRESS_FILE
+- Brain directory: $SCRIPT_DIR
+- Target repository directory: $TARGET_DIR
+
+Read and write the PRD/progress using the absolute paths above, and implement code changes only in the target repository.
+
+EOF
+)
+
   # Run the selected tool with the ralph prompt
   if [[ "$TOOL" == "amp" ]]; then
-    OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1) || true
+    OUTPUT=$(printf '%s\n%s' "$PROMPT_PREAMBLE" "$(cat "$SCRIPT_DIR/prompt.md")" | amp --dangerously-allow-all 2>&1) || true
   elif [[ "$TOOL" == "claude" ]]; then
     # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
-    OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1) || true
+    OUTPUT=$(printf '%s\n%s' "$PROMPT_PREAMBLE" "$(cat "$SCRIPT_DIR/CLAUDE.md")" | claude --dangerously-skip-permissions --print 2>&1) || true
   else
-    # Codex CLI: use non-interactive exec mode with workspace-write sandbox
-    OUTPUT=$(codex exec --dangerously-bypass-approvals-and-sandbox -C "$SCRIPT_DIR" - < "$SCRIPT_DIR/CODEX.md" 2>&1) || true
+    # Codex CLI: run inside target repo, while keeping PRD/progress in brain directory
+    OUTPUT=$(printf '%s\n%s' "$PROMPT_PREAMBLE" "$(cat "$SCRIPT_DIR/CODEX.md")" | codex exec --dangerously-bypass-approvals-and-sandbox -C "$TARGET_DIR" - 2>&1) || true
   fi
   printf '%s\n' "$OUTPUT"
   

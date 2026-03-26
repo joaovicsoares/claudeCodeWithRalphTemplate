@@ -1,4 +1,4 @@
-﻿from dataclasses import asdict
+from dataclasses import asdict
 
 from fastapi import APIRouter, File, Form, UploadFile
 
@@ -17,8 +17,9 @@ async def create_job(
     prd_file: UploadFile = File(...),
     tool: str = Form("codex"),
     max_iterations: int = Form(50),
+    target_repo_path: str = Form('.'),
 ) -> dict:
-    job = await ralph_service.create_job(prd_file=prd_file, tool=tool, max_iterations=max_iterations)
+    job = await ralph_service.create_job(prd_file=prd_file, tool=tool, max_iterations=max_iterations, target_repo_path=target_repo_path)
     return {
         "job_id": job.job_id,
         "status": job.status,

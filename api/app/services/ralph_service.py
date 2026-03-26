@@ -29,12 +29,35 @@ def is_running() -> bool:
         return any(j.status == "running" for j in jobs.values())
 
 
-async def create_job(prd_file: UploadFile, tool: str = "codex", max_iterations: int = 50) -> JobState:
+def _resolve_target_repo(target_repo_path: str) -> Path:
+    target_repo = Path(target_repo_path).expanduser()
+    if not target_repo.is_absolute():
+        target_repo = (REPO_ROOT / target_repo).resolve()
+    else:
+        target_repo = target_repo.resolve()
+
+    if not target_repo.exists() or not target_repo.is_dir():
+        raise HTTPException(status_code=400, detail=f"target_repo_path must be an existing directory: {target_repo}")
+
+    if not (target_repo / ".git").exists():
+        raise HTTPException(status_code=400, detail=f"target_repo_path must be a git repository: {target_repo}")
+
+    return target_repo
+
+
+async def create_job(
+    prd_file: UploadFile,
+    tool: str = "codex",
+    max_iterations: int = 50,
+    target_repo_path: str = ".",
+) -> JobState:
     tool = tool.strip().lower()
     if tool not in {"amp", "claude", "codex"}:
         raise HTTPException(status_code=400, detail="tool must be amp, claude, or codex")
     if max_iterations < 1 or max_iterations > 500:
         raise HTTPException(status_code=400, detail="max_iterations must be between 1 and 500")
+
+    target_repo = _resolve_target_repo(target_repo_path)
 
     if prd_file.filename and not prd_file.filename.lower().endswith(".json"):
         raise HTTPException(status_code=400, detail="Only .json files are accepted")
@@ -58,6 +81,7 @@ async def create_job(prd_file: UploadFile, tool: str = "codex", max_iterations: 
         status="queued",
         tool=tool,
         max_iterations=max_iterations,
+        target_repo_path=str(target_repo),
         created_at=utc_now_iso(),
         log_file=log_file,
     )
@@ -86,6 +110,8 @@ def _run_loop_and_notify(job_id: str) -> None:
         "./scripts/ralph/ralph.sh",
         "--tool",
         job.tool,
+        "--target",
+        job.target_repo_path,
         str(job.max_iterations),
     ]
 
