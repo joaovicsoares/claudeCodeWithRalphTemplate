@@ -11,7 +11,10 @@
     }
   },
   "runArgs": [
-    "--init", "--privileged"
+    "--init", 
+    "--privileged",
+    "-p",
+    "8080:8080"
     // "--cap-add=NET_ADMIN",
     // "--cap-add=NET_RAW"
   ],
